@@ -31,3 +31,7 @@ func New(file *object.File, commit *object.Commit, signature Signature, line int
 func (f *Finding) URL(baseURL string) string {
 	return fmt.Sprintf("%s/blob/%s/%s#L%d", baseURL, f.CommitHash, f.Path, f.Line)
 }
+
+func (f *Finding) Key() string {
+	return fmt.Sprintf("%s:%s:%d:%s", f.CommitHash, f.Path, f.Line, f.Match)
+}

@@ -1,6 +1,7 @@
 package signatures
 
 import (
+	"log"
 	"regexp"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -47,6 +48,7 @@ func (s Signature) Find(commit *object.Commit) ([]Finding, error) {
 		fileFindings, err := s.Match(file)
 		if err != nil {
 			// Skip file on error
+			log.Print(err)
 			continue
 		}
 

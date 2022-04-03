@@ -1,10 +1,10 @@
 package client
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	g "github.com/olacin/gigot/pkg/git"
 	s "github.com/olacin/gigot/pkg/signatures"
 )
@@ -28,49 +28,63 @@ func New(signatures []s.Signature, repository *git.Repository) *Client {
 	}
 }
 
-func (c *Client) SaveFinding(finding s.Finding) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+func (c *Client) find(commits <-chan *object.Commit, findings chan<- s.Finding, wg *sync.WaitGroup) {
+	defer wg.Done()
 
-	// Don't add duplicates
-	var key string = fmt.Sprintf("%s:%s:%d:%s", finding.CommitHash, finding.Path, finding.Line, finding.Match)
-	if _, exists := c.seen[key]; exists {
-		return
+	for commit := range commits {
+		for _, sig := range c.Signatures {
+			matches, err := sig.Find(commit)
+			if err != nil {
+				continue
+			}
+
+			for _, finding := range matches {
+				c.mutex.Lock()
+				if _, exists := c.seen[finding.Key()]; exists {
+					continue
+				}
+
+				c.seen[finding.Key()] = true
+				c.mutex.Unlock()
+
+				findings <- finding
+			}
+		}
 	}
-
-	c.seen[key] = true
-	c.Findings = append(c.Findings, finding)
 }
 
-func (c *Client) Find() error {
-	var wg sync.WaitGroup
-
+func (c *Client) Find(workers int) error {
 	commits, err := g.Commits(c.Repository)
 	if err != nil {
 		return err
 	}
 
-	for _, commit := range commits {
+	jobs := make(chan *object.Commit)
+	findings := make(chan s.Finding)
+
+	var wg sync.WaitGroup
+
+	// Start workers
+	for w := 0; w < workers; w++ {
 		wg.Add(1)
-
-		commit := commit
-
-		go func() {
-			defer wg.Done()
-			for _, sig := range c.Signatures {
-				findings, err := sig.Find(commit)
-				if err != nil {
-					continue
-				}
-
-				for _, finding := range findings {
-					c.SaveFinding(finding)
-				}
-			}
-		}()
+		go c.find(jobs, findings, &wg)
 	}
 
-	wg.Wait()
+	// Send commits into channel
+	for _, commit := range commits {
+		jobs <- commit
+	}
+	close(jobs)
+
+	go func() {
+		wg.Wait()
+		close(findings)
+	}()
+
+	// Gather findings in client
+	for finding := range findings {
+		c.Findings = append(c.Findings, finding)
+	}
 
 	return nil
 }

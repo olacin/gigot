@@ -13,7 +13,7 @@ import (
 var sigs = []signatures.Signature{{
 	Name:        "Testify",
 	Description: "Checks if testify is a project dependency",
-	Pattern:     regexp.MustCompile("\"github.com/stretchr/testify/assert\""),
+	Pattern:     regexp.MustCompile("(?i)testify"),
 	Score:       3,
 }}
 
@@ -33,7 +33,7 @@ func main() {
 	c := client.New(sigs, repo)
 
 	log.Print("Starting analysis")
-	c.Find()
+	c.Find(1000)
 	log.Print("Analysis has ended")
 
 	for _, f := range c.Findings {
