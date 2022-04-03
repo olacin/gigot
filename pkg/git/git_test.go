@@ -23,7 +23,7 @@ func TestCommits(t *testing.T) {
 	commits, err := Commits(repo)
 
 	assert.Nil(t, err)
-	assert.Greater(t, len(commits), 0)
+	assert.NotEmpty(t, commits)
 }
 
 func TestFiles(t *testing.T) {
@@ -33,10 +33,6 @@ func TestFiles(t *testing.T) {
 	commit, _ := repo.CommitObject(plumbing.NewHash("3bf80aaf4587881854af6033befe8874ebdabb9c"))
 	files, err := Files(commit)
 
-	for _, f := range files {
-		contents, _ := f.Contents()
-		t.Log(f.Name, f.Size, contents)
-	}
-
 	assert.Nil(t, err)
+	assert.NotEmpty(t, files)
 }
