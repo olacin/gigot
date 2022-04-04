@@ -1,24 +1,28 @@
-package client
+package gigot
 
 import (
 	"sync"
 
-	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	g "github.com/olacin/gigot/pkg/git"
-	s "github.com/olacin/gigot/pkg/signatures"
 )
 
+// Client provides an instance to search Findings in a Git repository.
 type Client struct {
-	Signatures []s.Signature
-	Repository *git.Repository
-	mutex      sync.Mutex
-	Findings   []s.Finding
-	seen       map[string]bool
+	// Signatures is the list of signatures to search for.
+	Signatures []Signature
+	// Repository is the Git repository to be analyzed.
+	Repository Repository
+	// mutex is a mutex that prevents goroutines from concurrent accesses.
+	mutex sync.Mutex
+	// Findings is the list of Findings in a Git repository.
+	Findings []Finding
+	// seen allows a Client to avoid duplicate findings.
+	seen map[string]bool
 }
 
-func New(signatures []s.Signature, repository *git.Repository) *Client {
-	findings := make([]s.Finding, 0)
+// NewClient initializes a Client.
+func NewClient(signatures []Signature, repository Repository) *Client {
+	findings := make([]Finding, 0)
 	seen := make(map[string]bool)
 	return &Client{
 		Signatures: signatures,
@@ -28,12 +32,13 @@ func New(signatures []s.Signature, repository *git.Repository) *Client {
 	}
 }
 
-func (c *Client) find(commits <-chan *object.Commit, findings chan<- s.Finding, wg *sync.WaitGroup) {
+// find is a goroutine which searches for Findings.
+func (c *Client) find(commits <-chan *object.Commit, findings chan<- Finding, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for commit := range commits {
 		for _, sig := range c.Signatures {
-			matches, err := sig.Find(commit)
+			matches, err := sig.Find(c.Repository, commit)
 			if err != nil {
 				continue
 			}
@@ -53,14 +58,15 @@ func (c *Client) find(commits <-chan *object.Commit, findings chan<- s.Finding, 
 	}
 }
 
+// Find start a user-defined number of workers to search Findings in a Git repository.
 func (c *Client) Find(workers int) error {
-	commits, err := g.Commits(c.Repository)
+	commits, err := c.Repository.Commits()
 	if err != nil {
 		return err
 	}
 
 	jobs := make(chan *object.Commit)
-	findings := make(chan s.Finding)
+	findings := make(chan Finding)
 
 	var wg sync.WaitGroup
 

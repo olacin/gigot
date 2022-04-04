@@ -1,20 +1,25 @@
-package signatures
+package gigot
 
 import (
 	"log"
 	"regexp"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/olacin/gigot/pkg/git"
 )
 
+// Signature is a descriptive pattern to match a file against.
 type Signature struct {
-	Name        string
+	// Name is the name of a signature.
+	Name string
+	// Description is a descriptive text indicating what the signature searches.
 	Description string
-	Pattern     *regexp.Regexp
-	Score       int
+	// Pattern is a regular expression pattern to match against.
+	Pattern *regexp.Regexp
+	// Score is a user-defined score indicating the severity of a Finding.
+	Score int
 }
 
+// Match tries to find Findings on every line of a file.
 func (s Signature) Match(file *object.File) ([]Finding, error) {
 	content, err := file.Lines()
 	if err != nil {
@@ -36,8 +41,9 @@ func (s Signature) Match(file *object.File) ([]Finding, error) {
 	return findings, nil
 }
 
-func (s Signature) Find(commit *object.Commit) ([]Finding, error) {
-	files, err := git.Files(commit)
+// Find tries to find Findings on every file of a commit.
+func (s Signature) Find(repository Repository, commit *object.Commit) ([]Finding, error) {
+	files, err := repository.Files(commit)
 	if err != nil {
 		return nil, err
 	}
